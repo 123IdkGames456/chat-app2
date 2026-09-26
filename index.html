@@ -49,9 +49,11 @@ function addMessage(d,mine=false){
 }
 function broadcast(d,except){for(let [id,c] of connections)if(id!==except&&c.open)try{c.send(d)}catch(e){}}
 function receiveChunk(d,from){
- let t=transfers.get(d.id);if(!t){t={name:d.name,size:d.size,type:d.mime,chunks:[],received:0,total:d.total};transfers.set(d.id,t)}
- t.chunks[d.index]=d.chunk;t.received++;broadcast(d,from);
- if(d.end){let blob=new Blob(t.chunks,{type:t.type||"application/octet-stream"});transfers.delete(d.id);let saved={name:d.sender||"Guest",pfp:d.pfp||"",file:{name:t.name,size:t.size,type:t.type,blob},fileName:t.name,size:t.size,mime:t.type};addMessage(saved,false);persistFile(saved,false)}
+ let t=transfers.get(d.id);if(!t){t={name:d.name,size:d.size,type:d.mime,chunks:[],received:0,total:d.total,sender:d.sender||"Guest",pfp:d.pfp||""};transfers.set(d.id,t)}
+ if(!t.chunks[d.index]){t.chunks[d.index]=d.chunk;t.received++}
+ broadcast(d,from);
+ if(d.end)t.endSeen=true;
+ if(t.endSeen&&t.received>=t.total){let blob=new Blob(t.chunks,{type:t.type||"application/octet-stream"});transfers.delete(d.id);let saved={name:t.sender,pfp:t.pfp,file:{name:t.name,size:t.size,type:t.type,blob},fileName:t.name,size:t.size,mime:t.type};addMessage(saved,false);persistFile(saved,false)}
 }
 async function sendFile(file){
  if(!connections.size){toast("Connect to a peer first");return}
