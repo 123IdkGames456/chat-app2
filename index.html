@@ -59,14 +59,55 @@ async function sendFile(file){
  let msg=$("messages").lastElementChild,bar=document.createElement("div");bar.className="progress";let i=document.createElement("i");bar.append(i);msg.querySelector(".fileCard").append(bar);
  for(let n=0;n<total;n++){let chunk=await file.slice(n*CHUNK,(n+1)*CHUNK).arrayBuffer();broadcast({type:"file",id,name:file.name,size:file.size,mime:file.type,total,index:n,chunk,sender:name,pfp,end:n===total-1});i.style.width=((n+1)/total*100)+"%";await new Promise(r=>setTimeout(r,0))}setTimeout(()=>bar.remove(),500)
 }
+const reconnectTimers=new Map();
+let startingPeer=false;
+function scheduleReconnect(id,delay=1200){if(!id||id===peer?.id||reconnectTimers.has(id))return;const timer=setTimeout(()=>{reconnectTimers.delete(id);if(peer&&peer.open&&!connections.has(id))connectTo(id)},delay);reconnectTimers.set(id,timer)}
 function attach(c){
- connections.set(c.peer,c);setStatus();c.on("open",()=>{setStatus();try{c.send({type:"hello",name,pfp})}catch(e){}});c.on("data",d=>{if(d.type==="hello"){return}if(d.type==="chat"){addMessage(d);broadcast(d,c.peer);return}if(d.type==="file"){receiveChunk(d,c.peer)}});c.on("close",()=>{connections.delete(c.peer);setStatus()});c.on("error",()=>{connections.delete(c.peer);setStatus()})
+ if(!c)return;
+ connections.set(c.peer,c);setStatus();
+ c.on("open",()=>{connections.set(c.peer,c);setStatus();try{c.send({type:"hello",name,pfp})}catch(e){}});
+ c.on("data",d=>{if(d.type==="hello"){return}if(d.type==="chat"){addMessage(d);broadcast(d,c.peer);return}if(d.type==="file"){receiveChunk(d,c.peer)}});
+ c.on("close",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
+ c.on("error",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
 }
-function connectTo(id){if(!peer||id===peer.id||connections.has(id))return;attach(peer.connect(id,{reliable:true}))}
+function connectTo(id){if(!peer||!peer.open||id===peer.id||connections.has(id))return;try{attach(peer.connect(id,{reliable:true}))}catch(e){scheduleReconnect(id,1500)}}
+function reconnectAll(slots){if(!peer||!peer.open)return;for(const id of slots)if(id!==peer.id&&!connections.has(id))connectTo(id)}
 function start(){
  room="global";name=($("name").value.trim()||"Guest").slice(0,30);$("roomDisplay").value=room;$("join").classList.add("hidden");$("app").classList.remove("hidden");$("myAvatar").innerHTML=pfp?'<img src="'+pfp.replace(/"/g,"&quot;")+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px">':"✦";
  const prefix="p2p-chat-"+room+"-",slots=Array.from({length:12},(_,i)=>prefix+i),tried=new Set();
- function trySlot(){const available=slots.filter(x=>!tried.has(x));if(!available.length){toast("Room is full");return}const id=available[Math.floor(Math.random()*available.length)];tried.add(id);peer=new Peer(id,{host:"0.peerjs.com",port:443,path:"/",secure:true});peer.on("open",myId=>{setStatus();slots.filter(x=>x!==myId).forEach(connectTo);localStorage.setItem("p2p-last-room",room)});peer.on("connection",attach);peer.on("call",call=>{call.answer();call.on("error",()=>{});call.on("stream",stream=>{let box=$("messages"),empty=box.querySelector(".empty");if(empty)empty.remove();let el=document.createElement("div");el.className="msg";let av=document.createElement("div");av.className="avatar";let wrap=document.createElement("div");wrap.className="bubbleWrap";let n=document.createElement("div");n.className="name";n.textContent=(call.metadata&&call.metadata.name)||"Guest";wrap.append(n);let bubble=document.createElement("div");bubble.className="bubble";let t=document.createElement("div");t.className="text";t.textContent="Live screen share";bubble.append(t);let v=document.createElement("video");v.srcObject=stream;v.autoplay=true;v.playsInline=true;v.controls=true;v.style.cssText="display:block;width:100%;max-height:390px;object-fit:contain;background:#050608;border-radius:10px";bubble.append(v);wrap.append(bubble);el.append(av,wrap);box.append(el);scroll()})});peer.on("error",e=>{if(e.type==="unavailable-id"){trySlot();return}toast("Connection error: "+e.type);$("status").textContent="Connection error"})}trySlot()
+ function makePeer(){
+  if(startingPeer)return;
+  startingPeer=true;
+  const available=slots.filter(x=>!tried.has(x));
+  if(!available.length){startingPeer=false;toast("Room is full");return}
+  const id=available[Math.floor(Math.random()*available.length)];
+  tried.add(id);
+  peer=new Peer(id,{host:"0.peerjs.com",port:443,path:"/",secure:true});
+  peer.on("open",myId=>{startingPeer=false;setStatus();slots.filter(x=>x!==myId).forEach(connectTo);localStorage.setItem("p2p-last-room",room)});
+  peer.on("connection",attach);
+  peer.on("call",call=>{
+   call.answer();
+   call.on("error",()=>{});
+   call.on("stream",stream=>{
+    let box=$("messages"),empty=box.querySelector(".empty");if(empty)empty.remove();
+    let el=document.createElement("div");el.className="msg";
+    let av=document.createElement("div");av.className="avatar";
+    let wrap=document.createElement("div");wrap.className="bubbleWrap";
+    let n=document.createElement("div");n.className="name";n.textContent=(call.metadata&&call.metadata.name)||"Guest";wrap.append(n);
+    let bubble=document.createElement("div");bubble.className="bubble";
+    let t=document.createElement("div");t.className="text";t.textContent="Live screen share";bubble.append(t);
+    let v=document.createElement("video");v.srcObject=stream;v.autoplay=true;v.playsInline=true;v.controls=true;v.style.cssText="display:block;width:100%;max-height:390px;object-fit:contain;background:#050608;border-radius:10px";bubble.append(v);
+    wrap.append(bubble);el.append(av,wrap);box.append(el);scroll()
+   })
+  });
+  peer.on("disconnected",()=>{setStatus();try{peer.reconnect()}catch(e){}});
+  peer.on("close",()=>{startingPeer=false;setStatus();setTimeout(makePeer,1500)});
+  peer.on("error",e=>{
+   if(e.type==="unavailable-id"){startingPeer=false;setTimeout(makePeer,300);return}
+   startingPeer=false;setStatus();setTimeout(()=>{if(peer&&peer.open){reconnectAll(slots)}else makePeer()},1200)
+  });
+ }
+ makePeer();
 }
 $("pfpPick").onclick=()=>$("pfpInput").click();$("pfpInput").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{pfp=r.result;$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';localStorage.setItem("chat2-pfp",pfp)};r.readAsDataURL(f)};
 $("name").value=localStorage.getItem("chat2-name")||"";pfp=localStorage.getItem("chat2-pfp")||"";globalBackground=localStorage.getItem("chat2-global-background")||"";if(globalBackground)applyGlobalBackground(globalBackground);if(pfp)$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';
@@ -88,7 +129,7 @@ imageLibrarySend.onclick=async()=>{if(!selectedLibraryImage)return;try{imageLibr
 imageLibraryModal.onclick=e=>{if(e.target===imageLibraryModal)closeImageLibrary()};
 const settingsModal=$("settingsModal"),backgroundInput=$("backgroundInput");loadSettings();initChatDB();document.querySelectorAll(".settingsTab").forEach(t=>t.onclick=()=>{document.querySelectorAll(".settingsTab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".settingsPanel").forEach(x=>x.classList.add("hidden"));t.classList.add("active");document.querySelector('[data-panel="'+t.dataset.tab+'"]')?.classList.remove("hidden")});$("settingsBtn").onclick=()=>settingsModal.classList.remove("hidden");settingsModal.querySelector(".settingsClose").onclick=()=>settingsModal.classList.add("hidden");settingsModal.onclick=e=>{if(e.target===settingsModal)settingsModal.classList.add("hidden")};$("changeBackgroundBtn").onclick=()=>backgroundInput.click();backgroundInput.onchange=e=>{const file=e.target.files[0];if(!file)return;if(!file.type.startsWith("image/")){toast("Choose an image");return}const reader=new FileReader();reader.onload=()=>{applyGlobalBackground(reader.result);toast("Local background saved")};reader.readAsDataURL(file);backgroundInput.value=""};["textSize","textFont","lineHeight","showNames","saveChatLocal","enterSend","messageSpacing","autoScroll","messageSound","desktopNotifications","saveFiles","accentColor","bubbleOpacity"].forEach(id=>{const el=$(id);if(!el)return;const event=el.tagName==="SELECT"?"change":"input";el.addEventListener(event,()=>{settings.textSize=+$("textSize").value;settings.textFont=$("textFont").value;settings.lineHeight=+$("lineHeight").value;settings.showNames=$("showNames").checked;settings.saveChatLocal=$("saveChatLocal").checked;settings.enterSend=$("enterSend").checked;settings.messageSpacing=+$("messageSpacing").value;settings.autoScroll=$("autoScroll").checked;settings.messageSound=$("messageSound").checked;settings.desktopNotifications=$("desktopNotifications").checked;settings.saveFiles=$("saveFiles").checked;settings.accentColor=$("accentColor").value;settings.bubbleOpacity=+$("bubbleOpacity").value;saveSettings();applySettings();if(id==="desktopNotifications"&&settings.desktopNotifications&&"Notification"in window&&Notification.permission==="default")Notification.requestPermission()})});$("clearSavedChat").onclick=async()=>{await clearSaved();$("messages").innerHTML='<div class="empty"><div><div class="emptyIcon">✦</div><div>Saved chat cleared from this device.</div></div></div>';toast("Saved chat cleared")};$("resetSettings").onclick=()=>{settings={...defaultSettings};saveSettings();applySettings();toast("Settings reset")};
 document.addEventListener("click",e=>{if(!imageLibraryMenu.contains(e.target)&&e.target!==$("attachBtn"))imageLibraryMenu.style.display="none"});
-$("shareBtn").onclick=async()=>{if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;$("shareBtn").textContent="Share screen + audio";return}try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});$("shareBtn").textContent="Stop sharing";screenStream.getVideoTracks()[0].onended=()=>{screenStream=null;$("shareBtn").textContent="Share screen + audio"};for(let [id,c] of connections)if(c.open){try{const call=peer.call(id,screenStream,{metadata:{name,pfp}});call.on("error",()=>toast("Screen share connection failed"))}catch(e){toast("Could not share with a peer")}}}catch(e){toast("Screen sharing cancelled")}};
+$("shareBtn").onclick=async()=>{if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;$("shareBtn").textContent="Share screen + audio";return}try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});$("shareBtn").textContent="Stop sharing";const videoTrack=screenStream.getVideoTracks()[0];if(videoTrack)videoTrack.onended=()=>{$("shareBtn").click()};for(let [id,c] of [...connections])if(c.open){try{const call=peer.call(id,screenStream,{metadata:{name,pfp}});call.on("close",()=>{});call.on("error",()=>scheduleReconnect(id,1000))}catch(e){scheduleReconnect(id,1000)}}}catch(e){toast("Screen sharing cancelled")}};
 function saveChat(){const clone=$("messages").cloneNode(true);clone.querySelectorAll(".progress").forEach(x=>x.remove());clone.querySelectorAll("video").forEach(v=>{const wrap=document.createElement("div");wrap.className="savedVideo";wrap.innerHTML="<div class=\"videoIcon\">▶</div><div><b>Video</b><div>Video from chat</div></div>";v.replaceWith(wrap)});const css=document.querySelector("style").textContent;const safeRoom=room.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");const html='<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Chat - '+safeRoom+'</title><style>'+css+'body{overflow:auto;background:#07080c}.saved{width:100%;max-width:1000px;margin:0 auto;min-height:100vh}.savedHead{padding:22px 18px;border-bottom:1px solid var(--line);background:#0b0e14}.savedHead h1{margin:0;font-size:20px}.savedHead p{margin:5px 0 0;color:var(--muted);font-size:12px}.messages{height:auto;overflow:visible}.savedVideo{height:180px;display:flex;align-items:center;gap:14px;padding:20px;background:#090c12;border-radius:10px;color:#fff}.videoIcon{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#6658ee;font-size:20px}.savedNote{padding:18px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}</style></head><body><div class="saved"><div class="savedHead"><h1>Chat App 2</h1><p>Room: '+safeRoom+' · Saved chat</p></div>'+clone.outerHTML+'<div class="savedNote">This is a saved copy of the chat. Sending controls and live screen-sharing controls are not included.</div></div></body></html>';const blob=new Blob([html],{type:"text/html;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="chat-"+(room||"saved")+"-"+new Date().toISOString().slice(0,10)+".html";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast("Chat saved as HTML")}
 async function copyRoom(){try{await navigator.clipboard.writeText(room);toast("Room code copied")}catch(e){toast(room)}}$("saveBtn").onclick=saveChat;$("copyBtn").onclick=copyRoom;$("copyRoomBtn").onclick=copyRoom;$("leaveBtn").onclick=()=>location.reload();
 </script></body></html>
