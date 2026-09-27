@@ -74,16 +74,23 @@ function connectTo(id){if(!peer||!peer.open||id===peer.id||connections.has(id))r
 function reconnectAll(slots){if(!peer||!peer.open)return;for(const id of slots)if(id!==peer.id&&!connections.has(id))connectTo(id)}
 function start(){
  room="global";name=($("name").value.trim()||"Guest").slice(0,30);$("roomDisplay").value=room;$("join").classList.add("hidden");$("app").classList.remove("hidden");$("myAvatar").innerHTML=pfp?'<img src="'+pfp.replace(/"/g,"&quot;")+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px">':"✦";
- const prefix="p2p-chat-"+room+"-",slots=Array.from({length:12},(_,i)=>prefix+i),tried=new Set();
+ const prefix="p2p-chat-"+room+"-",tried=new Set(),slots=Array.from({length:0});
+ let nextSlot=0;
+ function connectKnownSlots(){
+  if(!peer||!peer.open)return;
+  const limit=nextSlot;
+  for(let i=0;i<limit;i++){
+   const id=prefix+i;
+   if(id!==peer.id&&!connections.has(id))connectTo(id);
+  }
+ }
  function makePeer(){
   if(startingPeer)return;
   startingPeer=true;
-  const available=slots.filter(x=>!tried.has(x));
-  if(!available.length){startingPeer=false;toast("Room is full");return}
-  const id=available[Math.floor(Math.random()*available.length)];
+  const id=prefix+nextSlot++;
   tried.add(id);
   peer=new Peer(id,{host:"0.peerjs.com",port:443,path:"/",secure:true});
-  peer.on("open",myId=>{startingPeer=false;setStatus();slots.filter(x=>x!==myId).forEach(connectTo);localStorage.setItem("p2p-last-room",room)});
+  peer.on("open",myId=>{startingPeer=false;setStatus();connectKnownSlots();localStorage.setItem("p2p-last-room",room)});
   peer.on("connection",attach);
   peer.on("call",call=>{
    if(!call.metadata||!call.metadata.screenShare){call.answer();return}
@@ -99,7 +106,7 @@ function start(){
   peer.on("disconnected",()=>{setStatus();try{peer.reconnect()}catch(e){}});
   peer.on("close",()=>{startingPeer=false;setStatus();setTimeout(makePeer,1500)});
   peer.on("error",e=>{
-   if(e.type==="unavailable-id"){startingPeer=false;setTimeout(makePeer,300);return}
+   if(e.type==="unavailable-id"){startingPeer=false;setTimeout(makePeer,100);return}
    startingPeer=false;setStatus();setTimeout(()=>{if(peer&&peer.open){reconnectAll(slots)}else makePeer()},1200)
   });
  }
