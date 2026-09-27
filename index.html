@@ -47,10 +47,21 @@ function renderFile(f){
 function addMessage(d,mine=false){
  let box=$("messages"),empty=box.querySelector(".empty");if(empty)empty.remove();let el=document.createElement("div");el.className="msg"+(mine?" mine":"");let av=document.createElement("div");av.className="avatar";av.innerHTML=avatarHtml(d,mine);let wrap=document.createElement("div");wrap.className="bubbleWrap";let n=document.createElement("div");n.className="name";n.textContent=mine?"You":d.name||"Guest";wrap.append(n);n.style.display=settings.showNames?"":"none";let bubble=document.createElement("div");bubble.className="bubble";bubble.style.opacity=settings.bubbleOpacity/100;if(d.text){let t=document.createElement("div");t.className="text";t.textContent=d.text;bubble.append(t)}if(d.file)bubble.append(renderFile(d.file));wrap.append(bubble);el.append(av,wrap);el.style.marginBottom=settings.messageSpacing+"px";box.append(el);if(!restoringChat&&d.type!=="hello"){if(!mine)incomingNotice(d);if(d.file){}else persistMessage(d,mine)}scroll()
 }
-function broadcast(d,except){for(let [id,c] of connections)if(id!==except&&c.open)try{c.send(d)}catch(e){}}
+const seenMessages=new Set();
+function messageKey(d){
+ if(!d)return "";
+ if(d.id)return String(d.id);
+ return [d.type||"",d.name||"",d.time||"",d.text||"",d.id||""].join("|");
+}
+function broadcast(d,except){
+ const key=messageKey(d);
+ if(key)seenMessages.add(key);
+ for(let [id,c] of connections)if(id!==except&&c.open)try{c.send(d)}catch(e){}
+}
 function receiveChunk(d,from){
  let t=transfers.get(d.id);if(!t){t={name:d.name,size:d.size,type:d.mime,chunks:[],received:0,total:d.total};transfers.set(d.id,t)}
- t.chunks[d.index]=d.chunk;t.received++;broadcast(d,from);
+ if(t.chunks[d.index])return;
+ t.chunks[d.index]=d.chunk;t.received++;
  if(d.end){let blob=new Blob(t.chunks,{type:t.type||"application/octet-stream"});transfers.delete(d.id);let saved={name:d.sender||"Guest",pfp:d.pfp||"",file:{name:t.name,size:t.size,type:t.type,blob},fileName:t.name,size:t.size,mime:t.type};addMessage(saved,false);persistFile(saved,false)}
 }
 async function sendFile(file){
@@ -66,7 +77,7 @@ function attach(c){
  if(!c)return;
  connections.set(c.peer,c);setStatus();
  c.on("open",()=>{connections.set(c.peer,c);setStatus();try{c.send({type:"hello",name,pfp})}catch(e){};if(screenStream)sendScreenToPeer(c.peer)});
- c.on("data",d=>{if(d.type==="hello"){return}if(d.type==="chat"){addMessage(d);broadcast(d,c.peer);return}if(d.type==="file"){receiveChunk(d,c.peer);return}if(d.type==="screen-start"){if(screenStream)sendScreenToPeer(c.peer);return}if(d.type==="screen-stop"){removeScreenMessage(c.peer);return}});
+ c.on("data",d=>{if(d.type==="hello"){return}if(d.type==="chat"){const key=messageKey(d);if(seenMessages.has(key))return;seenMessages.add(key);addMessage(d);return}if(d.type==="file"){receiveChunk(d,c.peer);return}if(d.type==="screen-start"){if(screenStream)sendScreenToPeer(c.peer);return}if(d.type==="screen-stop"){removeScreenMessage(c.peer);return}});
  c.on("close",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
  c.on("error",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
 }
@@ -115,7 +126,7 @@ function start(){
 $("pfpPick").onclick=()=>$("pfpInput").click();$("pfpInput").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{pfp=r.result;$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';localStorage.setItem("chat2-pfp",pfp)};r.readAsDataURL(f)};
 $("name").value=localStorage.getItem("chat2-name")||"";pfp=localStorage.getItem("chat2-pfp")||"";globalBackground=localStorage.getItem("chat2-global-background")||"";if(globalBackground)applyGlobalBackground(globalBackground);if(pfp)$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';
 $("joinBtn").onclick=()=>{localStorage.setItem("chat2-name",$("name").value.trim());start()};$("name").addEventListener("keydown",e=>{if(e.key==="Enter")$("joinBtn").click()});
-$("send").onsubmit=e=>{e.preventDefault();let text=$("message").value.trim();if(!text)return;let d={type:"chat",name,pfp,text,time:Date.now()};addMessage(d,true);broadcast(d);$("message").value="";$("message").focus()};$("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&settings.enterSend){e.preventDefault();$("send").requestSubmit()}});
+$("send").onsubmit=e=>{e.preventDefault();let text=$("message").value.trim();if(!text)return;let d={type:"chat",id:name+"-"+Date.now()+"-"+Math.random().toString(36).slice(2),name,pfp,text,time:Date.now()};const key=messageKey(d);seenMessages.add(key);addMessage(d,true);broadcast(d);$("message").value="";$("message").focus()};$("message").addEventListener("keydown",e=>{if(e.key==="Enter"&&!e.shiftKey&&settings.enterSend){e.preventDefault();$("send").requestSubmit()}});
 const imageLibraryMenu=document.createElement("div");imageLibraryMenu.id="attachmentMenu";imageLibraryMenu.style.cssText="position:fixed;z-index:60;display:none;min-width:220px;padding:8px;border:1px solid #ffffff16;background:#12151ff7;backdrop-filter:blur(22px);border-radius:16px;box-shadow:0 20px 60px #000b";imageLibraryMenu.innerHTML='<button type="button" id="deviceImageOption" style="display:block;width:100%;padding:13px 14px;border-radius:11px;background:transparent;text-align:left;color:#fff;font-weight:700;font-size:12px">🖼️ Choose image from device</button><button type="button" id="githubImageOption" style="display:block;width:100%;padding:13px 14px;border-radius:11px;background:transparent;text-align:left;color:#fff;font-weight:700;font-size:12px">🗂️ GitHub Image Library</button>';document.body.appendChild(imageLibraryMenu);
 const imageLibraryModal=document.createElement("div");imageLibraryModal.className="imageLibraryModal hidden";imageLibraryModal.innerHTML='<div class="imageLibraryCard"><div class="imageLibraryHead"><div><h2>Image Library</h2><div class="imageLibrarySub">Images stored in the Chat App 2 GitHub image-library folder</div></div><button type="button" class="imageLibraryClose">×</button></div><div class="imageLibraryGrid"></div><div class="imageLibraryFoot"><span class="imageLibraryStatus">Choose an image to send</span><button type="button" class="imageLibraryRefresh">Refresh</button><button type="button" class="imageLibrarySend" disabled>Send image</button></div></div>';document.body.appendChild(imageLibraryModal);
 const imageLibraryGrid=imageLibraryModal.querySelector(".imageLibraryGrid"),imageLibraryStatus=imageLibraryModal.querySelector(".imageLibraryStatus"),imageLibrarySend=imageLibraryModal.querySelector(".imageLibrarySend");let selectedLibraryImage=null;
