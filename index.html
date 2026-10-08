@@ -29,9 +29,8 @@ body:before{content:"";position:fixed;inset:-30%;pointer-events:none;background:
 </head>
 <body>
 <div id="join" class="panel"><div class="card"><div class="heroLogo">✦</div><h1>Chat App 2</h1><p>Private browser-to-browser chat with text, media, files and screen sharing.</p><div class="profileSetup"><div id="pfpPreview" class="pfpPreview">G</div><div><button type="button" id="pfpPick" class="pfpPick">Choose profile picture</button><input id="pfpInput" type="file" accept="image/*" class="hidden"></div></div><input id="name" maxlength="30" placeholder="Your name"><button id="joinBtn" style="width:100%;height:48px;margin-top:9px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));font-weight:800;font-size:12px;box-shadow:0 9px 26px #6659ff25">Enter chat</button><div class="small">Everyone automatically joins the same chat. Your profile picture stays on this device.</div></div></div>
-<div id="app" class="app hidden"><header class="top"><div class="brand"><div id="myAvatar" class="logo">✦</div><div><div class="title">Chat App 2</div><div id="status" class="status">Waiting for peers</div></div></div><div class="topActions"><button id="shareBtn">Share screen + audio</button><button id="settingsBtn">⚙ Settings</button><button id="saveBtn" class="ghost">Save chat</button><button id="loadBtn" class="ghost">Load chat</button><input id="loadInput" type="file" accept=".json,application/json" class="hidden"><button id="copyBtn" class="ghost">Copy room</button><button id="leaveBtn">Leave</button></div></header><div id="roomBar" class="room hidden"><input id="roomDisplay" readonly><button id="copyRoomBtn">Copy</button></div><main id="messages" class="messages"><div class="empty"><div><div class="emptyIcon">✦</div><div>Join the room from another browser to start chatting.</div></div></div></main><form id="send" class="send"><input id="fileInput" type="file" multiple accept="image/*,video/*,*/*" class="hidden"><button type="button" id="attachBtn" class="attach" title="Send files">＋</button><input id="message" autocomplete="off" placeholder="Write a message…"><button class="sendBtn">Send</button></form></div><div id="toast" class="toast"></div><div id="settingsModal" class="settingsModal hidden"><div class="settingsCard"><div class="settingsHead"><h2>Settings</h2><button type="button" class="settingsClose">×</button></div><div class="settingsTabs"><button type="button" class="settingsTab active" data-tab="appearance">Appearance</button><button type="button" class="settingsTab" data-tab="text">Text</button><button type="button" class="settingsTab" data-tab="chat">Chat</button><button type="button" class="settingsTab" data-tab="notifications">Notifications</button><button type="button" class="settingsTab" data-tab="privacy">Privacy</button></div><div class="settingsContent"><section class="settingsPanel" data-panel="appearance"><div class="settingRow"><div><b>Local Background</b><small>Use an image saved only on this device.</small></div><button type="button" id="changeBackgroundBtn" class="changeBackground">Change</button></div><div id="backgroundPreview" class="backgroundPreview"><span>No local background</span></div><div class="settingRow"><div><b>Accent color</b><small>Change the main UI accent.</small></div><input id="accentColor" type="color" value="#796cff"></div><div class="settingRow"><div><b>Bubble opacity</b><small>Change message bubble transparency.</small></div><input id="bubbleOpacity" type="range" min="55" max="100" value="100"></div><input id="backgroundInput" type="file" accept="image/*" class="hidden"></section><section class="settingsPanel hidden" data-panel="text"><div class="settingRow"><div><b>Text size</b><small>Change message text size.</small></div><input id="textSize" type="range" min="11" max="22" step=".5" value="13.5"><span id="textSizeValue">13.5px</span></div><div class="settingRow"><div><b>Font</b><small>Choose the message font.</small></div><select id="textFont"><option value="system">System</option><option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Verdana">Verdana</option><option value="monospace">Monospace</option></select></div><div class="settingRow"><div><b>Line spacing</b><small>Adjust space between lines.</small></div><input id="lineHeight" type="range" min="1.2" max="2" step=".05" value="1.55"><span id="lineHeightValue">1.55</span></div><div class="settingRow"><div><b>Show names</b><small>Show sender names above messages.</small></div><input id="showNames" type="checkbox" checked></div></section><section class="settingsPanel hidden" data-panel="chat"><div class="settingRow"><div><b>Save chat on this device</b><small>Restore chat after closing and reopening the browser.</small></div><input id="saveChatLocal" type="checkbox" checked></div><div class="settingRow"><div><b>Send with Enter</b><small>Enter sends; Shift+Enter makes a new line.</small></div><input id="enterSend" type="checkbox" checked></div><div class="settingRow"><div><b>Message spacing</b><small>Change the space between messages.</small></div><input id="messageSpacing" type="range" min="8" max="32" value="20"><span id="messageSpacingValue">20px</span></div><div class="settingRow"><div><b>Auto-scroll</b><small>Scroll down automatically for new messages.</small></div><input id="autoScroll" type="checkbox" checked></div></section><section class="settingsPanel hidden" data-panel="notifications"><div class="settingRow"><div><b>Message sound</b><small>Play a short sound for incoming messages.</small></div><input id="messageSound" type="checkbox"></div><div class="settingRow"><div><b>Desktop notifications</b><small>Use browser notifications when available.</small></div><input id="desktopNotifications" type="checkbox"></div></section><section class="settingsPanel hidden" data-panel="privacy"><div class="settingRow"><div><b>Save received files</b><small>Keep received images and videos in local chat history.</small></div><input id="saveFiles" type="checkbox" checked></div><div class="settingRow"><div><b>Clear saved chat</b><small>Delete saved messages and files from this device.</small></div><button type="button" id="clearSavedChat" class="dangerBtn">Clear</button></div><div class="settingRow"><div><b>Reset settings</b><small>Restore all settings to their defaults.</small></div><button type="button" id="resetSettings" class="dangerBtn">Reset</button></div><div class="settingsNote">Your saved chat, profile and background stay on this device.</div></section></div></div></div><script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script>
-const $=id=>document.getElementById(id);let peer=null,room="",name="",pfp="",globalBackground="",connections=new Map(),transfers=new Map(),screenStream=null,restoringChat=false,chatDB=null;const CHUNK=48*1024;const defaultSettings={textSize:13.5,textFont:"system",lineHeight:1.55,showNames:true,saveChatLocal:true,enterSend:true,messageSpacing:20,autoScroll:true,messageSound:false,desktopNotifications:false,joinNotifications:true,saveFiles:true,accentColor:"#796cff",bubbleOpacity:100};let settings={...defaultSettings};
+<div id="app" class="app hidden"><header class="top"><div class="brand"><div id="myAvatar" class="logo">✦</div><div><div class="title">Chat App 2</div><div id="status" class="status">Waiting for peers</div></div></div><div class="topActions"><button id="shareBtn">Share screen + audio</button><button id="settingsBtn">⚙ Settings</button><button id="saveBtn" class="ghost">Save chat</button><button id="loadBtn" class="ghost">Load chat</button><input id="loadInput" type="file" accept=".json,application/json" class="hidden"><button id="copyBtn" class="ghost">Copy room</button><button id="leaveBtn">Leave</button></div></header><div id="roomBar" class="room hidden"><input id="roomDisplay" readonly><button id="copyRoomBtn">Copy</button></div><main id="messages" class="messages"><div class="empty"><div><div class="emptyIcon">✦</div><div>Join the room from another browser to start chatting.</div></div></div></main><form id="send" class="send"><input id="fileInput" type="file" multiple accept="image/*,video/*,*/*" class="hidden"><button type="button" id="attachBtn" class="attach" title="Send files">＋</button><input id="message" autocomplete="off" placeholder="Write a message…"><button class="sendBtn">Send</button></form></div><div id="toast" class="toast"></div><div id="settingsModal" class="settingsModal hidden"><div class="settingsCard"><div class="settingsHead"><h2>Settings</h2><button type="button" class="settingsClose">×</button></div><div class="settingsTabs"><button type="button" class="settingsTab active" data-tab="appearance">Appearance</button><button type="button" class="settingsTab" data-tab="text">Text</button><button type="button" class="settingsTab" data-tab="chat">Chat</button><button type="button" class="settingsTab" data-tab="notifications">Notifications</button><button type="button" class="settingsTab" data-tab="privacy">Privacy</button></div><div class="settingsContent"><section class="settingsPanel" data-panel="appearance"><div class="settingRow"><div><b>Local Background</b><small>Use an image saved only on this device.</small></div><button type="button" id="changeBackgroundBtn" class="changeBackground">Change</button></div><div id="backgroundPreview" class="backgroundPreview"><span>No local background</span></div><div class="settingRow"><div><b>Accent color</b><small>Change the main UI accent.</small></div><input id="accentColor" type="color" value="#796cff"></div><div class="settingRow"><div><b>Bubble opacity</b><small>Change message bubble transparency.</small></div><input id="bubbleOpacity" type="range" min="55" max="100" value="100"></div><input id="backgroundInput" type="file" accept="image/*" class="hidden"></section><section class="settingsPanel hidden" data-panel="text"><div class="settingRow"><div><b>Text size</b><small>Change message text size.</small></div><input id="textSize" type="range" min="11" max="22" step=".5" value="13.5"><span id="textSizeValue">13.5px</span></div><div class="settingRow"><div><b>Font</b><small>Choose the message font.</small></div><select id="textFont"><option value="system">System</option><option value="Arial">Arial</option><option value="Georgia">Georgia</option><option value="Verdana">Verdana</option><option value="monospace">Monospace</option></select></div><div class="settingRow"><div><b>Line spacing</b><small>Adjust space between lines.</small></div><input id="lineHeight" type="range" min="1.2" max="2" step=".05" value="1.55"><span id="lineHeightValue">1.55</span></div><div class="settingRow"><div><b>Show names</b><small>Show sender names above messages.</small></div><input id="showNames" type="checkbox" checked></div></section><section class="settingsPanel hidden" data-panel="chat"><div class="settingRow"><div><b>Save chat on this device</b><small>Restore chat after closing and reopening the browser.</small></div><input id="saveChatLocal" type="checkbox" checked></div><div class="settingRow"><div><b>Send with Enter</b><small>Enter sends; Shift+Enter makes a new line.</small></div><input id="enterSend" type="checkbox" checked></div><div class="settingRow"><div><b>Message spacing</b><small>Change the space between messages.</small></div><input id="messageSpacing" type="range" min="8" max="32" value="20"><span id="messageSpacingValue">20px</span></div><div class="settingRow"><div><b>Auto-scroll</b><small>Scroll down automatically for new messages.</small></div><input id="autoScroll" type="checkbox" checked></div></section><section class="settingsPanel hidden" data-panel="notifications"><div class="settingRow"><div><b>Message sound</b><small>Play a short sound for incoming messages.</small></div><input id="messageSound" type="checkbox"></div><div class="settingRow"><div><b>Desktop notifications</b><small>Use browser notifications when available.</small></div><input id="desktopNotifications" type="checkbox"></div></section><section class="settingsPanel hidden" data-panel="privacy"><div class="settingRow"><div><b>Save received files</b><small>Keep received images and videos in local chat history.</small></div><input id="saveFiles" type="checkbox" checked></div><div class="settingRow"><div><b>Clear saved chat</b><small>Delete saved messages and files from this device.</small></div><button type="button" id="clearSavedChat" class="dangerBtn">Clear</button></div><div class="settingRow"><div><b>Reset settings</b><small>Restore all settings to their defaults.</small></div><button type="button" id="resetSettings" class="dangerBtn">Reset</button></div><div class="settingsNote">Your saved chat, profile and background stay on this device.</div></section></div></div></div><script>
+const $=id=>document.getElementById(id);let socket=null,room="",name="",pfp="",globalBackground="",connections=new Map(),transfers=new Map(),screenStream=null,restoringChat=false,chatDB=null;const CHUNK=48*1024;const WS_URL=localStorage.getItem("chat2-server-url")||"wss://YOUR-CHAT-SERVER.example/ws";const defaultSettings={textSize:13.5,textFont:"system",lineHeight:1.55,showNames:true,saveChatLocal:true,enterSend:true,messageSpacing:20,autoScroll:true,messageSound:false,desktopNotifications:false,joinNotifications:true,saveFiles:true,accentColor:"#796cff",bubbleOpacity:100};let settings={...defaultSettings};
 const clean=s=>String(s||"").trim().replace(/[^a-zA-Z0-9_-]/g,"-").slice(0,40),formatSize=n=>n<1024?n+" B":n<1048576?(n/1024).toFixed(1)+" KB":n<1073741824?(n/1048576).toFixed(1)+" MB":(n/1073741824).toFixed(1)+" GB";
 function loadSettings(){try{settings={...defaultSettings,...JSON.parse(localStorage.getItem("chat2-settings")||"{}")}}catch(e){}applySettings()}function saveSettings(){localStorage.setItem("chat2-settings",JSON.stringify(settings))}function applySettings(){document.documentElement.style.setProperty("--text-size",settings.textSize+"px");document.documentElement.style.setProperty("--chat-font",settings.textFont==="system"?"Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif":settings.textFont);document.documentElement.style.setProperty("--text-line-height",settings.lineHeight);document.documentElement.style.setProperty("--accent",settings.accentColor);document.documentElement.style.setProperty("--accent2",settings.accentColor);document.querySelectorAll(".bubble").forEach(b=>b.style.opacity=settings.bubbleOpacity/100);document.querySelectorAll(".name").forEach(n=>n.style.display=settings.showNames?"":"none");document.querySelectorAll(".msg").forEach(m=>m.style.marginBottom=settings.messageSpacing+"px");if($("textSize"))$("textSize").value=settings.textSize;if($("textSizeValue"))$("textSizeValue").textContent=settings.textSize+"px";if($("textFont"))$("textFont").value=settings.textFont;if($("lineHeight"))$("lineHeight").value=settings.lineHeight;if($("lineHeightValue"))$("lineHeightValue").textContent=settings.lineHeight;if($("showNames"))$("showNames").checked=settings.showNames;if($("saveChatLocal"))$("saveChatLocal").checked=settings.saveChatLocal;if($("enterSend"))$("enterSend").checked=settings.enterSend;if($("messageSpacing"))$("messageSpacing").value=settings.messageSpacing;if($("messageSpacingValue"))$("messageSpacingValue").textContent=settings.messageSpacing+"px";if($("autoScroll"))$("autoScroll").checked=settings.autoScroll;if($("messageSound"))$("messageSound").checked=settings.messageSound;if($("desktopNotifications"))$("desktopNotifications").checked=settings.desktopNotifications;if($("joinNotifications"))$("joinNotifications").checked=settings.joinNotifications;if($("saveFiles"))$("saveFiles").checked=settings.saveFiles;if($("accentColor"))$("accentColor").value=settings.accentColor;if($("bubbleOpacity"))$("bubbleOpacity").value=settings.bubbleOpacity}let dbReadyPromise=null,dbWriteQueue=[];async function initChatDB(){if(dbReadyPromise)return dbReadyPromise;dbReadyPromise=new Promise((resolve,reject)=>{try{const q=indexedDB.open("chat-app-2-history",2);q.onupgradeneeded=()=>{const db=q.result;if(!db.objectStoreNames.contains("messages"))db.createObjectStore("messages",{keyPath:"id",autoIncrement:true})};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)}catch(e){reject(e)}}).then(async db=>{chatDB=db;try{const rows=await new Promise((resolve,reject)=>{const q=db.transaction("messages","readonly").objectStore("messages").getAll();q.onsuccess=()=>resolve(q.result||[]);q.onerror=()=>reject(q.error)});restoringChat=true;for(const d of rows){if(d.fileBlob)addMessage({name:d.name,pfp:d.pfp,text:d.text,file:{name:d.fileName,size:d.size,type:d.mime||"application/octet-stream",blob:d.fileBlob}},!!d.mine);else addMessage(d,!!d.mine)}restoringChat=false;for(const job of dbWriteQueue.splice(0))job();scroll()}catch(e){restoringChat=false}return db}).catch(e=>{chatDB=null;dbWriteQueue.splice(0);return null});return dbReadyPromise}function queueDBWrite(fn){if(chatDB){try{fn(chatDB);return}catch(e){}}dbWriteQueue.push(()=>{if(chatDB)try{fn(chatDB)}catch(e){}})}function persistMessage(d,mine=false){if(!settings.saveChatLocal||restoringChat)return;queueDBWrite(db=>db.transaction("messages","readwrite").objectStore("messages").add({name:d.name,pfp:d.pfp,text:d.text||"",time:d.time||Date.now(),mine}))}function persistFile(d,mine=false){if(!settings.saveChatLocal||!settings.saveFiles||restoringChat||!d.file||!d.file.blob)return;queueDBWrite(db=>db.transaction("messages","readwrite").objectStore("messages").add({name:d.name,pfp:d.pfp,text:d.text||"",time:d.time||Date.now(),fileBlob:d.file.blob,fileName:d.file.name,size:d.file.size,mime:d.file.type||"application/octet-stream",mine}))}async function clearSaved(){try{if(chatDB)await new Promise((resolve,reject)=>{const q=chatDB.transaction("messages","readwrite").objectStore("messages").clear();q.onsuccess=resolve;q.onerror=()=>reject(q.error)});dbWriteQueue=[]}catch(e){toast("Could not clear saved chat")}}function playIncoming(){if(!settings.messageSound)return;try{const A=AudioContext||webkitAudioContext,a=new A,o=a.createOscillator(),g=a.createGain();o.frequency.value=660;g.gain.value=.03;o.connect(g);g.connect(o.context.destination);o.start();o.stop(o.context.currentTime+.08)}catch(e){}}function incomingNotice(d){playIncoming();if(settings.desktopNotifications&&"Notification"in window&&Notification.permission==="granted")new Notification(d.name||"New message",{body:d.text||"New file received"})}function toast(t){$("toast").textContent=t;$("toast").classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>$("toast").classList.remove("show"),1800)}
 function applyGlobalBackground(data){globalBackground=data||"";document.body.style.setProperty("--chat-background-image",globalBackground?"url("+JSON.stringify(globalBackground)+")":"none");$("app").style.background=globalBackground?"linear-gradient(#08090f55,#08090f55),url("+JSON.stringify(globalBackground)+") center/cover fixed no-repeat":"linear-gradient(135deg,#090a10,#08090f 52%,#0b0d15)";$("messages").style.background=globalBackground?"linear-gradient(#08090f66,#08090f66),url("+JSON.stringify(globalBackground)+") center/cover fixed no-repeat":"transparent";const p=$("backgroundPreview");if(p)p.innerHTML=globalBackground?'<img src="'+globalBackground.replace(/"/g,"&quot;")+'">':"<span>No global background</span>";if(globalBackground)localStorage.setItem("chat2-global-background",globalBackground);else localStorage.removeItem("chat2-global-background")}
@@ -70,58 +69,78 @@ async function sendFile(file){
  let msg=$("messages").lastElementChild,bar=document.createElement("div");bar.className="progress";let i=document.createElement("i");bar.append(i);msg.querySelector(".fileCard").append(bar);
  for(let n=0;n<total;n++){let chunk=await file.slice(n*CHUNK,(n+1)*CHUNK).arrayBuffer();broadcast({type:"file",id,name:file.name,size:file.size,mime:file.type,total,index:n,chunk,sender:name,pfp,end:n===total-1});i.style.width=((n+1)/total*100)+"%";await new Promise(r=>setTimeout(r,0))}setTimeout(()=>bar.remove(),500)
 }
-const reconnectTimers=new Map();
-let startingPeer=false;
-function scheduleReconnect(id,delay=1200){if(!id||id===peer?.id||reconnectTimers.has(id))return;const timer=setTimeout(()=>{reconnectTimers.delete(id);if(peer&&peer.open&&!connections.has(id))connectTo(id)},delay);reconnectTimers.set(id,timer)}
-function attach(c){
- if(!c)return;
- connections.set(c.peer,c);setStatus();
- c.on("open",()=>{connections.set(c.peer,c);setStatus();try{c.send({type:"hello",name,pfp})}catch(e){};if(screenStream)sendScreenToPeer(c.peer)});
- c.on("data",d=>{if(d.type==="hello"){return}if(d.type==="chat"){const key=messageKey(d);if(seenMessages.has(key))return;seenMessages.add(key);addMessage(d);return}if(d.type==="file"){receiveChunk(d,c.peer);return}if(d.type==="screen-start"){if(screenStream)sendScreenToPeer(c.peer);return}if(d.type==="screen-stop"){removeScreenMessage(c.peer);return}});
- c.on("close",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
- c.on("error",()=>{if(connections.get(c.peer)===c)connections.delete(c.peer);setStatus();scheduleReconnect(c.peer)});
+let reconnectTimer=null;
+function wsSend(d){
+ if(!socket||socket.readyState!==WebSocket.OPEN)return false;
+ try{socket.send(JSON.stringify(d));return true}catch(e){return false}
 }
-function connectTo(id){if(!peer||!peer.open||id===peer.id||connections.has(id))return;try{attach(peer.connect(id,{reliable:true}))}catch(e){scheduleReconnect(id,1500)}}
-function reconnectAll(slots){if(!peer||!peer.open)return;for(const id of slots)if(id!==peer.id&&!connections.has(id))connectTo(id)}
+function setStatus(){let n=connections.size;$("status").textContent=n?"Connected":"Connecting to relay…"}
+function connectRelay(){
+ if(socket&&(socket.readyState===WebSocket.OPEN||socket.readyState===WebSocket.CONNECTING))return;
+ if(!WS_URL||WS_URL.includes("YOUR-CHAT-SERVER")){$("status").textContent="Relay server not configured";return}
+ try{
+  socket=new WebSocket(WS_URL);
+  socket.binaryType="arraybuffer";
+  socket.onopen=()=>{
+   connections.clear();connections.set("relay",socket);setStatus();
+   wsSend({type:"join",room,name,pfp});
+  };
+  socket.onmessage=async e=>{
+   if(typeof e.data!=="string")return;
+   let d;try{d=JSON.parse(e.data)}catch(err){return}
+   if(d.type==="presence"){setStatus();return}
+   if(d.type==="chat"){const key=messageKey(d);if(seenMessages.has(key))return;seenMessages.add(key);addMessage(d);return}
+   if(d.type==="file"){receiveChunk(d);return}
+   if(d.type==="screen-start"||d.type==="screen-stop")return;
+  };
+  socket.onclose=()=>{
+   connections.clear();setStatus();
+   clearTimeout(reconnectTimer);reconnectTimer=setTimeout(connectRelay,2000);
+  };
+  socket.onerror=()=>setStatus();
+ }catch(e){setStatus();clearTimeout(reconnectTimer);reconnectTimer=setTimeout(connectRelay,2000)}
+}
+function broadcast(d,except){
+ const key=messageKey(d);
+ if(key)seenMessages.add(key);
+ wsSend(d);
+}
+function receiveChunk(d){
+ let t=transfers.get(d.id);
+ if(!t){t={name:d.name,size:d.size,type:d.mime,chunks:[],received:0,total:d.total};transfers.set(d.id,t)}
+ if(t.chunks[d.index])return;
+ try{t.chunks[d.index]=Uint8Array.from(atob(d.chunk),c=>c.charCodeAt(0)).buffer}catch(e){return}
+ t.received++;
+ if(t.received>=t.total){
+  let blob=new Blob(t.chunks,{type:t.type||"application/octet-stream"});
+  transfers.delete(d.id);
+  let saved={name:d.sender||"Guest",pfp:d.pfp||"",file:{name:t.name,size:t.size,type:t.type,blob},fileName:t.name,size:t.size,mime:t.type};
+  addMessage(saved,false);persistFile(saved,false);
+ }
+}
+function arrayBufferToBase64(buffer){
+ let bytes=new Uint8Array(buffer),binary="";
+ const step=0x8000;
+ for(let i=0;i<bytes.length;i+=step)binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+step,bytes.length)));
+ return btoa(binary);
+}
+async function sendFile(file){
+ if(!socket||socket.readyState!==WebSocket.OPEN){toast("Connecting to chat server…");return}
+ let id=name+"-"+Date.now()+"-"+Math.random().toString(36).slice(2),total=Math.ceil(file.size/CHUNK)||1;
+ const localMessage={name,pfp,file:{name:file.name,size:file.size,type:file.type,blob:file}};
+ addMessage(localMessage,true);persistFile(localMessage,true);
+ let msg=$("messages").lastElementChild,bar=document.createElement("div");bar.className="progress";let i=document.createElement("i");bar.append(i);msg.querySelector(".fileCard").append(bar);
+ for(let n=0;n<total;n++){
+  let chunk=await file.slice(n*CHUNK,(n+1)*CHUNK).arrayBuffer();
+  wsSend({type:"file",id,name:file.name,size:file.size,mime:file.type,total,index:n,sender:name,pfp,chunk:arrayBufferToBase64(chunk)});
+  i.style.width=((n+1)/total*100)+"%";
+  await new Promise(r=>setTimeout(r,0));
+ }
+ setTimeout(()=>bar.remove(),500)
+}
 function start(){
  room="global";name=($("name").value.trim()||"Guest").slice(0,30);$("roomDisplay").value=room;$("join").classList.add("hidden");$("app").classList.remove("hidden");$("myAvatar").innerHTML=pfp?'<img src="'+pfp.replace(/"/g,"&quot;")+'" style="width:100%;height:100%;object-fit:cover;border-radius:12px">':"✦";
- const prefix="p2p-chat-"+room+"-",tried=new Set(),slots=Array.from({length:0});
- let nextSlot=0;
- function connectKnownSlots(){
-  if(!peer||!peer.open)return;
-  const limit=nextSlot;
-  for(let i=0;i<limit;i++){
-   const id=prefix+i;
-   if(id!==peer.id&&!connections.has(id))connectTo(id);
-  }
- }
- function makePeer(){
-  if(startingPeer)return;
-  startingPeer=true;
-  const id=prefix+nextSlot++;
-  tried.add(id);
-  peer=new Peer(id,{host:"0.peerjs.com",port:443,path:"/",secure:true});
-  peer.on("open",myId=>{startingPeer=false;setStatus();connectKnownSlots();localStorage.setItem("p2p-last-room",room)});
-  peer.on("connection",attach);
-  peer.on("call",call=>{
-   if(!call.metadata||!call.metadata.screenShare){call.answer();return}
-   call.answer();
-   call.on("error",()=>{});
-   call.on("stream",stream=>{
-    const id=call.peer;
-    addScreenMessage(id,call.metadata,stream);
-    call.on("close",()=>removeScreenMessage(id));
-    call.on("error",()=>removeScreenMessage(id));
-   })
-  });
-  peer.on("disconnected",()=>{setStatus();try{peer.reconnect()}catch(e){}});
-  peer.on("close",()=>{startingPeer=false;setStatus();setTimeout(makePeer,1500)});
-  peer.on("error",e=>{
-   if(e.type==="unavailable-id"){startingPeer=false;setTimeout(makePeer,100);return}
-   startingPeer=false;setStatus();setTimeout(()=>{if(peer&&peer.open){reconnectAll(slots)}else makePeer()},1200)
-  });
- }
- makePeer();
+ connectRelay();
 }
 $("pfpPick").onclick=()=>$("pfpInput").click();$("pfpInput").onchange=e=>{let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{pfp=r.result;$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';localStorage.setItem("chat2-pfp",pfp)};r.readAsDataURL(f)};
 $("name").value=localStorage.getItem("chat2-name")||"";pfp=localStorage.getItem("chat2-pfp")||"";globalBackground=localStorage.getItem("chat2-global-background")||"";if(globalBackground)applyGlobalBackground(globalBackground);if(pfp)$("pfpPreview").innerHTML='<img src="'+pfp+'" style="width:100%;height:100%;object-fit:cover">';
@@ -164,20 +183,9 @@ function addScreenMessage(id,metadata,stream){
  wrap.append(bubble);el.append(av,wrap);box.append(el);screenMessages.set(id,el);scroll();
  stream.getTracks().forEach(track=>track.addEventListener("ended",()=>removeScreenMessage(id)));
 }
-function sendScreenToPeer(id){
- if(!screenStream||!peer||!peer.open)return;
- const c=connections.get(id);if(!c||!c.open)return;
- try{
-  const call=peer.call(id,screenStream,{metadata:{name,pfp,screenShare:true}});
-  call.on("stream",()=>{});
-  call.on("close",()=>{});
-  call.on("error",()=>scheduleReconnect(id,1000));
- }catch(e){scheduleReconnect(id,1000)}
-}
-function broadcastScreenState(type){
- for(const [id,c] of connections)if(c.open)try{c.send({type,name,pfp})}catch(e){}
-}
-$("shareBtn").onclick=async()=>{if(screenStream){broadcastScreenState("screen-stop");screenStream.getTracks().forEach(t=>t.stop());screenStream=null;$("shareBtn").textContent="Share screen + audio";for(const id of screenMessages.keys())removeScreenMessage(id);return}try{screenStream=await navigator.mediaDevices.getDisplayMedia({video:true,audio:true});$("shareBtn").textContent="Stop sharing";broadcastScreenState("screen-start");const videoTrack=screenStream.getVideoTracks()[0];if(videoTrack)videoTrack.onended=()=>{$("shareBtn").click()};for(const [id,c] of [...connections])if(c.open)sendScreenToPeer(id)}catch(e){screenStream=null;toast("Screen sharing cancelled")}};
+function sendScreenToPeer(){toast("Live screen sharing is disabled in relay mode.");}
+function broadcastScreenState(type){wsSend({type,name,pfp})}
+$("shareBtn").onclick=async()=>{if(screenStream){screenStream.getTracks().forEach(t=>t.stop());screenStream=null;$("shareBtn").textContent="Share screen + audio";for(const id of screenMessages.keys())removeScreenMessage(id);return}toast("Screen sharing needs a separate media relay and is not enabled in WebSocket mode.");return};
 async function collectSavedRows(){if(!chatDB)return[];return await new Promise((resolve,reject)=>{const q=chatDB.transaction("messages","readonly").objectStore("messages").getAll();q.onsuccess=()=>resolve(q.result||[]);q.onerror=()=>reject(q.error)})}async function saveChat(){try{await initChatDB();const rows=await collectSavedRows();const exportRows=[];for(const d of rows){const x={name:d.name,pfp:d.pfp,text:d.text||"",time:d.time||Date.now(),mine:!!d.mine};if(d.fileBlob){x.fileName=d.fileName;x.size=d.size;x.mime=d.mime;x.fileData=await new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(fr.result);fr.onerror=()=>reject(fr.error);fr.readAsDataURL(d.fileBlob)})}exportRows.push(x)}const payload={format:"chat-app-2",version:1,room:room||"global",savedAt:Date.now(),messages:exportRows};const blob=new Blob([JSON.stringify(payload)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="chat-"+(room||"saved")+"-"+new Date().toISOString().slice(0,10)+".json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);toast("Chat saved") }catch(e){toast("Could not save chat")}}async function loadChatFile(file){try{const text=await file.text();const data=JSON.parse(text);if(!data||data.format!=="chat-app-2"||!Array.isArray(data.messages))throw new Error("invalid");await initChatDB();if(chatDB)await new Promise((resolve,reject)=>{const q=chatDB.transaction("messages","readwrite").objectStore("messages").clear();q.onsuccess=resolve;q.onerror=()=>reject(q.error)});$("messages").innerHTML="";restoringChat=true;for(const d of data.messages){let row={name:d.name||"Guest",pfp:d.pfp||"",text:d.text||"",time:d.time||Date.now(),mine:!!d.mine};if(d.fileData){const blob=await fetch(d.fileData).then(r=>r.blob());row.file={name:d.fileName||"file",size:d.size||blob.size,type:d.mime||blob.type||"application/octet-stream",blob};}addMessage(row,!!row.mine);if(chatDB){const stored={name:row.name,pfp:row.pfp,text:row.text,time:row.time,mine:row.mine};if(row.file){stored.fileBlob=row.file.blob;stored.fileName=row.file.name;stored.size=row.file.size;stored.mime=row.file.type}chatDB.transaction("messages","readwrite").objectStore("messages").add(stored)}}restoringChat=false;scroll();toast("Chat loaded")}catch(e){restoringChat=false;toast("Could not load chat file")}}
 async function copyRoom(){try{await navigator.clipboard.writeText(room);toast("Room code copied")}catch(e){toast(room)}}$("saveBtn").onclick=saveChat;$("loadBtn").onclick=()=>$("loadInput").click();$("loadInput").onchange=e=>{const f=e.target.files[0];if(f)loadChatFile(f);e.target.value=""};$("copyBtn").onclick=copyRoom;$("copyRoomBtn").onclick=copyRoom;$("leaveBtn").onclick=()=>location.reload();
 </script></body></html>
