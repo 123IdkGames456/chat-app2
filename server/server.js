@@ -1,15 +1,16 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import { WebSocketServer } from "ws";
 
 const port=Number(process.env.PORT||8787);
 const server=http.createServer((req,res)=>{
   if(req.url==="/health"){
-    res.writeHead(200,{"content-type":"application/json"});
-    res.end(JSON.stringify({ok:true,service:"chat-app2-relay"}));
+    res.writeHead(200,{"content-type":"application/json","cache-control":"no-store"});
+    res.end(JSON.stringify({ok:true,service:"chat-app2-relay",clients:wss.clients.size}));
     return;
   }
-  res.writeHead(404);
-  res.end("Not found");
+  res.writeHead(404,{"content-type":"text/plain"});
+  res.end("Chat App 2 relay");
 });
 
 const wss=new WebSocketServer({server,maxPayload:8*1024*1024});
@@ -21,45 +22,57 @@ function send(ws,data){
 }
 function leave(ws){
   const room=clients.get(ws);
-  if(!room)return;
   clients.delete(ws);
+  if(!room)return;
   const set=rooms.get(room);
   if(!set)return;
   set.delete(ws);
   if(!set.size)rooms.delete(room);
-  else for(const peer of set)send(peer,{type:"presence",count:set.size});
+  else broadcastPresence(room);
+}
+function broadcastPresence(room){
+  const set=rooms.get(room);
+  if(!set)return;
+  const payload={type:"presence",count:set.size};
+  for(const ws of set)send(ws,payload);
 }
 function broadcast(room,data,except){
   const set=rooms.get(room);
   if(!set)return;
   const payload=JSON.stringify(data);
-  for(const peer of set){
-    if(peer!==except&&peer.readyState===1)peer.send(payload);
+  for(const ws of set){
+    if(ws!==except&&ws.readyState===1)ws.send(payload);
   }
 }
 
 wss.on("connection",ws=>{
   ws.isAlive=true;
+  ws.userId=crypto.randomUUID();
   ws.on("pong",()=>ws.isAlive=true);
 
   ws.on("message",(raw,isBinary)=>{
     if(isBinary)return;
     let data;
     try{data=JSON.parse(raw.toString())}catch{return}
+
     if(data.type==="join"){
       const room=String(data.room||"global").slice(0,80);
       leave(ws);
       if(!rooms.has(room))rooms.set(room,new Set());
-      rooms.get(room).add(ws);
+      const set=rooms.get(room);
+      set.add(ws);
       clients.set(ws,room);
-      send(ws,{type:"presence",count:rooms.get(room).size});
-      broadcast(room,{type:"presence",count:rooms.get(room).size},ws);
+      send(ws,{type:"presence",count:set.size,clientId:ws.userId});
+      broadcastPresence(room);
       return;
     }
+
     const room=clients.get(ws);
     if(!room)return;
+
     if(data.type==="chat"||data.type==="file"){
-      broadcast(room,data,ws);
+      const message={...data,senderId:ws.userId,serverTime:Date.now()};
+      broadcast(room,message,ws);
     }
   });
 
@@ -75,4 +88,4 @@ setInterval(()=>{
   }
 },30000);
 
-server.listen(port,()=>console.log("Chat App 2 relay listening on "+port));
+server.listen(port,"0.0.0.0",()=>console.log("Chat App 2 relay listening on "+port));
