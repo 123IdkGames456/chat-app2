@@ -128,7 +128,7 @@ function parseMessage(m){
 let content=String(m.content||""),display=m.author||"Discord";
 const fence=String.fromCharCode(96).repeat(3);
 const wrapped=new RegExp("^"+fence+"text\\n([\\s\\S]*?)\\n"+fence+"$").exec(content);
-if(wrapped){content=wrapped[1];const split=content.indexOf(": ");if(split>0&&split<34){display=content.slice(0,split);content=content.slice(split+2)}content=content.split("\n").filter(line=>!line.startsWith("PFP: attached as chat-pfp.jpg")&&!line.startsWith("Image: attached as chat-image.jpg")).join("\n")}
+if(wrapped){content=wrapped[1];const split=content.indexOf(": ");if(split>0&&split<34){display=content.slice(0,split);content=content.slice(split+2)}content=content.split("\n").filter(line=>!line.startsWith("PFP: attached as chat-pfp.jpg")&&!line.startsWith("Image: attached as chat-image.jpg")&&!line.startsWith("Device ID: ")).join("\n")}
 return {id:m.id||display+content,author:display,content:content,timestamp:m.timestamp||"",deviceId:m.deviceId||m.device_id||m.senderDeviceId||m.sender_device_id||"",avatarBase64:m.avatarBase64||m.avatar_base64||m.avatarData||"",imageBase64:m.imageBase64||m.image_base64||"",attachments:m.attachments||[]}
 }
 function playMessageSound(){if(!settings.messageSound)return;try{const A=window.AudioContext||window.webkitAudioContext,a=new A,o=a.createOscillator(),g=a.createGain();o.frequency.value=660;g.gain.value=.025;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.09);o.onended=()=>a.close()}catch{}}
