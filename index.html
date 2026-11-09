@@ -148,7 +148,7 @@ function say(value,bad){feedback.textContent=value;feedback.className="feedback"
 function scroll(){if(settings.autoScroll)messages.scrollTop=messages.scrollHeight}
 function setConnection(ok){connection.textContent=ok?"Connected to chat server":"Not connected";connection.classList.toggle("on",ok)}
 function parseMessage(m){
-let content=String(m.content||""),display=m.author||"Discord";
+let content=String(m.content||""),display=m.author||"Unknown";
 const fence=String.fromCharCode(96).repeat(3);
 const wrapped=new RegExp("^"+fence+"text\\n([\\s\\S]*?)\\n"+fence+"$").exec(content);
 if(wrapped){content=wrapped[1];const split=content.indexOf(": ");if(split>0&&split<34){display=content.slice(0,split);content=content.slice(split+2)}content=content.split("\n").filter(line=>!line.startsWith("PFP: attached as chat-pfp.jpg")&&!line.startsWith("Image: attached as chat-image.jpg")&&!line.startsWith("Device ID: ")).join("\n")}
